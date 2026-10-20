@@ -25,7 +25,9 @@ without testing compatibility.
    and configure the service HTTPS domain to internal port 8000.
 5. Never run another MT5 service over the same Wine prefix concurrently.
 
-Compose uses the locally built image. A Git push alone does not copy source into
+Compose includes a build context for this repository and uses the locally built image.
+The build does NOT install the prepared Wine prefix or copy code into `/config`.
+A Git push alone does not copy source into
 the bind-mounted production config directory or deploy code automatically.
 Do not run a second standalone Compose service beside the existing Coolify one.
 
@@ -56,3 +58,46 @@ Store API key, broker credentials and VNC password in Coolify, never Git.
 Back up persistent data separately using encrypted external storage. Do not commit
 raw Coolify database exports, rendered container inspection or terminal login INI.
 Keep installation binaries and credentials out of Git history even in private repos.
+
+## Compose matching the current Coolify service
+
+`compose.yml` preserves the running service settings:
+
+- image `mt5-coolify:repaired`, build from the repository Dockerfile, pull_policy never;
+- restart unless-stopped, 2 CPU and 2 GiB RAM;
+- CUSTOM_USER=admin and secrets supplied through environment variables;
+- host mount `/opt/data/mt5-data/config:/config`;
+- VNC/web desktop port `3000:3000`, API `127.0.0.1:8100:8000`;
+- broker-login healthcheck and Docker log rotation 10m x 3.
+
+Port 3000 is published on all host interfaces to match the existing Coolify setup.
+Restrict it with the host firewall or bind it to localhost if remote VNC is unnecessary.
+RPyC port 18812 is not published.
+
+Old Coolify UUIDs, generated labels, container names and network IDs are omitted:
+the new Coolify installation generates its own. Host systemd maintenance is separate.
+
+### On a destination with prepared MT5 data
+
+```bash
+git clone git@github.com:xhekage/mt5-docker.git
+cd mt5-docker
+cp .env.example .env
+chmod 600 .env
+# Fill .env privately, restore the working Wine data, and copy reviewed config scripts.
+docker compose -f compose.yml build
+docker compose -f compose.yml up -d --no-build
+curl http://127.0.0.1:8100/health
+```
+
+Do not run those commands alongside the current production MT5 container.
+
+### Coolify from Git
+
+Create a Git-backed Docker Compose resource, select this repository, branch main,
+and Compose path `/compose.yml`. Configure the five secrets listed in .env.example,
+restore the prepared persistent data on the destination, and ensure source scripts
+are copied into that data directory. Set the service domain to HTTPS on internal
+port 8000. Build and deploy, then verify health, REST and WSS.
+
+This is configuration parity, NOT a fully automatic empty-server restore.
