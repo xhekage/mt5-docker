@@ -2,8 +2,9 @@
 # Lightweight image contract check; no broker credentials, live Wine or published ports.
 set -Eeuo pipefail
 image=${1:?Usage: verify_image.sh IMAGE}
-docker run --rm --network none --tmpfs /config:rw,size=32m \
-  --entrypoint /bin/bash "$image" -ec '
+docker run --rm --network none --tmpfs /config:rw,exec,size=32m \
+  --entrypoint /bin/bash "$image" -Eeuc '
+    trap '\''echo "Image verification failed at line $LINENO: $BASH_COMMAND" >&2'\'' ERR
     test "$(uname -m)" = x86_64
     id abc >/dev/null
     bash -n /opt/mt5-app/start_all.sh /custom-cont-init.d/90-mt5-app
