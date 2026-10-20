@@ -5,7 +5,7 @@
 The repository Dockerfile builds the Linux runtime dependencies, but does NOT
 bootstrap the complete working Windows/Wine terminal environment. Publishing this
 image to GHCR does NOT make it a self-contained migration image. In particular,
-it does not include an authenticated Wine prefix, broker terminal initialization,
+it does not include a prepared Wine prefix or broker terminal initialization,
 Windows Python installation or an automated clean-prefix startup test.
 
 Do not build an image by committing the running container or copying the live
@@ -40,9 +40,9 @@ Pin the verified image by digest in Compose, not by latest.
 
 - Pin Linux base digest, Windows Python and MT5 package versions; verify IPC patch compatibility.
 - Build a CLEAN broker-terminal seed without credentials, session, account or history data.
-- Bake application source into a path outside the persistent data mount.
+- Application source is included at /opt/mt5-app and installed into /config on startup; fresh-image integration testing remains required.
 - Initialize an empty data volume automatically without overwriting existing data.
-- Include bounded log maintenance without requiring manual host installation.
+- An in-container log maintenance worker is included; fresh-image integration testing remains required.
 - On an isolated amd64 destination and new volume: test first boot, login from
   runtime secrets, health, symbols, dates, all-range history, CSV/JSON and WSS auth.
 - Test invalid auth, idle/no automatic subscription, unsubscribe and restart.

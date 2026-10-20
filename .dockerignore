@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+.wine
+**/__pycache__
+**/*.pyc
+**/*.log
+backups
+*.tar*
+*.zip
+*.exe

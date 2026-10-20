@@ -55,8 +55,9 @@ cd mt5-docker
 ```
 
 Prepare the persistent directory `/opt/data/mt5-data/config` with the working Wine
-environment, then copy the reviewed application files from `config/` into it.
-Do not overwrite or delete its `.wine` directory. Configure `.env`, then run:
+environment, The image copies its versioned application files into `/config` during startup and
+configures Openbox autostart. It does not overwrite `.wine`; restore prepared Wine
+data separately before starting. Configure `.env`, then run:
 
 ```bash
 docker compose -f compose.yml build
@@ -74,7 +75,7 @@ RPyC port 18812 is not published. Never run two terminals over the same Wine dir
 1. Create a Git-backed Docker Compose resource for this repository.
 2. Select branch `main` and Compose path `/compose.yml`.
 3. Configure the five environment variables above.
-4. Prepare the persistent data and application files on the destination host.
+4. Restore the prepared persistent Wine data on the destination host; application code is installed from the image at startup.
 5. Configure your HTTPS domain for service port **8000**.
 6. Build/deploy and check `/health` and `/docs`.
 
@@ -175,8 +176,9 @@ Use the WebSocket tab in `/docs` for a browser tester, or `/ws/protocol` for pro
 
 ## Logging and disk maintenance
 
-Docker logs rotate at 10 MB × 3 files. To enable periodic MT5 file-log maintenance,
-copy the units in `systemd/` to `/etc/systemd/system/`, then run:
+Docker logs rotate at 10 MB × 3 files. Images built from this source run file-log
+maintenance every 15 minutes alongside the API. For older deployments without
+the in-container worker, copy the units in `systemd/` to `/etc/systemd/system/`, then run:
 
 ```bash
 sudo systemctl daemon-reload
@@ -217,7 +219,10 @@ The published runtime still needs the prepared persistent Wine data.
 
 ## Updating
 
-Pull the reviewed source, copy updated application files into the persistent
-config directory, rebuild if runtime dependencies changed, and redeploy through
-your existing deployment method. A Git push alone does not update bind-mounted code.
+Pull the reviewed source, rebuild the image, and redeploy through your existing
+deployment method. Startup installs the image version of application code into
+the persistent config directory, so manual edits there are replaced on startup.
+A Git push alone does not deploy the service; trigger a rebuild/redeploy or configure
+your deployment automation. The current production container needs rebuilding
+before it gains this startup behavior.
 Keep broker credentials and encrypted data backups separate from Git.

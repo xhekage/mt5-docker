@@ -3,9 +3,10 @@ import fcntl
 import json
 import os
 import time
+import sys
 from pathlib import Path
 
-ROOT = Path('/opt/data/mt5-data/config')
+ROOT = Path('/config') if Path('/config/start_all.sh').exists() else Path('/opt/data/mt5-data/config')
 MAX_FILE = 10 * 1024 * 1024
 MAX_LOGS = 100 * 1024 * 1024
 RETENTION = 7 * 86400
@@ -68,7 +69,24 @@ def main():
                       'files_changed': changed, 'warnings': warnings}))
 
 
-if __name__ == '__main__':
-    with open('/run/lock/mt5-disk-guard.lock', 'w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+def run_once():
+    # Shared data-volume lock coordinates host and container maintenance.
+    path = ROOT / '.disk-guard.lock'
+    try:
+        lock_file = open(path, 'a')
+    except PermissionError:
+        lock_file = open(path, 'r')
+    with lock_file as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
         main()
+
+
+if __name__ == '__main__':
+    while True:
+        run_once()
+        if '--loop' not in sys.argv:
+            break
+        time.sleep(900)

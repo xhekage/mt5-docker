@@ -33,3 +33,7 @@ Also install /etc/systemd/system/mt5-disk-guard.{service,timer}, then run:
     systemctl enable --now mt5-disk-guard.timer
 
 The service uses /opt/data/mt5-data/config and requires host Python 3/systemd.
+
+Images built from the updated repository also run disk_guard.py --loop inside the
+container every 15 minutes. Both host and container workers use the shared data
+volume lock .disk-guard.lock. Host units remain optional for older deployments.

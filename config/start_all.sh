@@ -9,5 +9,7 @@ wine 'C:\Python39-64\python.exe' 'Z:\config\rpyc_server_patched.py' >> /config/r
 bridge_pid=$!
 python3 /config/start_fastapi_bridge.py &
 api_pid=$!
-trap 'kill "$terminal_pid" "$bridge_pid" "$api_pid" 2>/dev/null || true' EXIT TERM INT
+python3 /config/disk_guard.py --loop &
+guard_pid=$!
+trap 'kill "$terminal_pid" "$bridge_pid" "$api_pid" "$guard_pid" 2>/dev/null || true' EXIT TERM INT
 wait -n "$terminal_pid" "$bridge_pid" "$api_pid"
