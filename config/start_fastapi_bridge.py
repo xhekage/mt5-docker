@@ -16,6 +16,7 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from docs_theme import themed
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from candle_history import candle_response
+from history_docs import HISTORY_DOCS, EXPORT_DOCS
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -605,6 +606,22 @@ for route in app.routes:
             "Jika rentang berisi lebih banyak bar daripada `count`, satu request **tidak** mengembalikan seluruh rentang.",
             "Jika count eksplisit, hasil dibatasi count; tanpa count dan dengan kedua tanggal, seluruh rentang dikirim."
         ).replace("Default count=500", "Default efektif tanpa rentang lengkap: count=500")
+
+
+for route in app.routes:
+    if getattr(route, "path", "") in ("/history/candles", "/history/candles/export"):
+        route.description = EXPORT_DOCS if route.path.endswith('/export') else HISTORY_DOCS
+        examples = route.body_field.field_info.openapi_examples
+        translations = {
+            'all_range': ('Complete date range — no count', 'Stream all available bars in the supplied range.'),
+            'full': ('Full example — all parameters', 'Only symbol and timeframe are required; other filters are optional.'),
+            'full_csv': ('Full CSV example — all filters', 'Download a CSV attachment using the same history filters.'),
+            'minimal_csv': ('Minimal — latest CSV bars', 'Only symbol and timeframe are required.'),
+        }
+        for name, (summary, description) in translations.items():
+            if name in examples:
+                examples[name]['summary'] = summary
+                examples[name]['description'] = description
 
 
 if __name__ == "__main__":
