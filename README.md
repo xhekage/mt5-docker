@@ -52,6 +52,76 @@ Check `/health`, authenticated symbols/history/export, WSS auth and explicit
 subscribe/unsubscribe. Range results depend on broker history and MaxBars.
 Long streams can time out; a broken download may be incomplete.
 
+### Automated service verification
+
+Use a separate Python environment with `websockets==15.0.1` installed.
+Supply `API_KEY` through a secure environment/secret mechanism, then run:
+
+```bash
+python scripts/verify_deployment.py https://YOUR_DOMAIN
+```
+
+The script checks broker login, symbol discovery, history range handling,
+JSON/CSV export parity, documentation routes, and WSS subscribe/unsubscribe.
+It does not print credentials. History requests may populate terminal caches.
+It verifies an already running service; it does **not** prove empty-volume bootstrap,
+complete historical data availability, update/rollback safety or every-tick delivery.
+
+## Publish an image to GitHub Container Registry (GHCR)
+
+1. Open this repository's **Actions** tab.
+2. Select **Verify source and publish runtime recipe**.
+3. Choose **Run workflow**, branch `main`.
+4. Wait for compilation, Docker build and registry push to finish.
+5. Inspect the package **`ghcr.io/xhekage/mt5-docker`** and record its image digest.
+
+The workflow also runs for pushed version tags matching `v*`. It publishes SHA/version
+tags, not a mutable `latest`. Publishing uses the automatic GitHub Actions
+`GITHUB_TOKEN` with `packages: write`; no personal registry token is committed.
+Enable Actions under **Settings → Actions → General** if needed, and review package
+visibility/access explicitly. Keep the package private if that is your intended policy.
+
+**Build/publish success is not migration certification.** This workflow builds the
+current runtime recipe, which still requires the prepared persistent Wine data.
+It does not run the live broker smoke test or a fresh-volume integration test.
+
+### Pulling a private image
+
+Configure registry credentials in Coolify, or log in on the destination:
+
+```bash
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+```
+
+Enter a GitHub personal access token (classic) with `read:packages` and access to
+the package at the password prompt. Never put tokens in Git, command arguments,
+documentation or chat. The SSH deploy key authorizes Git, not GHCR.
+
+After testing a release, pin its exact digest, for example:
+
+```yaml
+image: ghcr.io/xhekage/mt5-docker@sha256:REPLACE_WITH_VERIFIED_DIGEST
+```
+
+The current `compose.yml` still uses a **local build** and `pull_policy: never`.
+To deploy from GHCR, replace its image reference with the verified digest, remove
+the build section, and change the pull policy to `missing` (or `always` as appropriate).
+Do not make that change in production until the image and prepared data are verified.
+
+## Migration readiness
+
+| Check | Status |
+| --- | --- |
+| Current prepared service: broker, REST, exports, docs, WSS smoke test | Passed on the existing server |
+| GHCR workflow definition | Added; remote execution must be checked in Actions |
+| Self-contained runtime with clean terminal/Wine bootstrap | Not implemented |
+| Deployment with an empty data volume on another host | Not verified |
+| Update/rollback on the new deployment design | Not verified |
+
+Do not treat this repository as a guaranteed one-command fresh-server restore.
+See [MIGRATION-VERIFICATION.md](MIGRATION-VERIFICATION.md) for required release gates,
+registry instructions and the distinction between service checks and migration acceptance.
+
 ## Secrets and backups
 
 Store API key, broker credentials and VNC password in Coolify, never Git.
