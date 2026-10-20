@@ -1,0 +1,31 @@
+services:
+  mt5-api:
+    image: mt5-coolify:repaired
+    pull_policy: never
+    restart: unless-stopped
+    cpus: '2.0'
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    environment:
+      CUSTOM_USER: admin
+      PASSWORD: ${VNC_PASSWORD:?Set VNC_PASSWORD}
+      API_KEY: ${API_KEY:?Set API_KEY}
+      MT5_LOGIN: ${MT5_LOGIN:?Set MT5_LOGIN}
+      MT5_PASSWORD: ${MT5_PASSWORD:?Set MT5_PASSWORD}
+      MT5_SERVER: ${MT5_SERVER:?Set MT5_SERVER}
+    volumes:
+      - /opt/data/mt5-data/config:/config
+    ports:
+      - '127.0.0.1:8100:8000'
+    expose:
+      - '8000'
+    healthcheck:
+      test: [CMD, python3, -c, "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=5)); exit(0 if d['mt5_connected'] and d['account_logged_in'] else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

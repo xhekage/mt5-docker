@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.wine/
+*.log
+__pycache__/
+*.pyc
+backups/
+*.tar
+*.tar.gz
+*.zip
+*.exe
+*.dmp
+mt5-login.ini
+environment.json
+*.pem
+*.key

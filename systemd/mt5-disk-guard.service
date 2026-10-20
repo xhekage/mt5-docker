@@ -1,0 +1,13 @@
+[Unit]
+Description=Bound MT5 file logs and report disk growth without deleting trading history
+ConditionPathIsDirectory=/opt/data/mt5-data/config
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/data/mt5-data/config/disk_guard.py
+Nice=15
+IOSchedulingClass=idle
+ProtectSystem=strict
+ReadWritePaths=/opt/data/mt5-data/config /run/lock
+PrivateTmp=true
+NoNewPrivileges=true
