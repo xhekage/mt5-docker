@@ -1,0 +1,30 @@
+# For an ISOLATED destination only; never mount the production Wine data here.
+services:
+  mt5-verify:
+    image: ${MT5_VERIFY_IMAGE:?Set an image pinned by sha256 digest}
+    pull_policy: missing
+    restart: 'no'
+    cpus: '2.0'
+    mem_limit: 2g
+    environment:
+      CUSTOM_USER: admin
+      PASSWORD: ${VNC_PASSWORD:?Required}
+      API_KEY: ${API_KEY:?Required}
+      MT5_LOGIN: ${MT5_LOGIN:?Required}
+      MT5_PASSWORD: ${MT5_PASSWORD:?Required}
+      MT5_SERVER: ${MT5_SERVER:?Required}
+    volumes:
+      - ${MT5_VERIFY_DATA:?Set a dedicated test data directory}:/config
+    ports:
+      - '127.0.0.1:18100:8000'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: [CMD, python3, -c, "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=5)); exit(0 if d['mt5_connected'] and d['account_logged_in'] else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

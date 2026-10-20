@@ -200,6 +200,12 @@ python scripts/verify_deployment.py https://YOUR_DOMAIN
 Checks include broker login, symbols, history, CSV/JSON exports, documentation,
 and WSS subscribe/unsubscribe. The script does not print the API key.
 
+The publishing workflow also checks the built image before uploading it: startup
+installation, imports, dependencies and autostart, using an isolated tmpfs and no
+credentials. For destination testing use `compose.verify.yml` with a dedicated
+test directory and a digest-pinned image. See
+[the verification procedure](MIGRATION-VERIFICATION.md) for commands and acceptance evidence.
+
 ## Publish to GHCR
 
 Open **Actions → Verify source and publish runtime recipe → Run workflow** on `main`.
@@ -226,3 +232,9 @@ A Git push alone does not deploy the service; trigger a rebuild/redeploy or conf
 your deployment automation. The current production container needs rebuilding
 before it gains this startup behavior.
 Keep broker credentials and encrypted data backups separate from Git.
+
+## License
+
+Original project code is available under the [MIT License](LICENSE).
+Third-party components retain their own licenses and distribution terms;
+see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
