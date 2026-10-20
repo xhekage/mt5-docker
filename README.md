@@ -1,173 +1,223 @@
-# MT5 API / WSS deployment source
+# MT5 REST API & WebSocket
 
-Small source/configuration backup of the deployed MT5 REST and WebSocket service.
-No credentials, Wine data, installer executables or Docker images are committed.
+Read-only market data and account API for MetaTrader 5, with live WebSocket ticks,
+candle history, CSV/JSON exports, and an interactive documentation portal.
 
-## Important: not yet a fresh-server installer
+## Features
 
-This repository preserves current code and deployment configuration, not a complete
-reproducible installation from zero. The Dockerfile uses an upstream latest base
-and Wine packages; these may change. Existing persistent Wine data additionally
-contains IC Markets terminal, Windows Python and MetaTrader5 5.0.36 with an IPC
-patch. Those binaries are NOT in Git. Preserve an encrypted backup of the working
-Wine prefix or implement/test a bootstrap installer before migrating.
+- FastAPI REST endpoints with `X-API-Key` authentication.
+- Broker symbol discovery and account information.
+- Candle history across all 21 standard MT5 timeframes.
+- Optional date range, count, offset, order, and unfinished-bar filters.
+- Full available date-range streaming when both dates are supplied without count.
+- CSV and JSON downloads using the same filters and history engine.
+- WebSocket latest-tick polling every second, explicit subscribe/unsubscribe,
+  heartbeat, bounded queues, and no tick persistence.
+- English Swagger documentation and WebSocket browser tester.
+- Shared light/dark/system theme with one theme picker.
+- Docker healthcheck, CPU/RAM limits, and bounded log retention.
+- GitHub Actions workflow for publishing the runtime image to GHCR.
 
-The IPC patch is version-specific. Do not upgrade the Windows MT5 Python package
-without testing compatibility.
+## Requirements
 
-## Deployment on an existing prepared destination
+- Linux amd64 destination with Docker Engine and Docker Compose.
+- Prepared MT5 Wine data containing the broker terminal, Windows Python,
+  MetaTrader5 5.0.36, and the compatible IPC patch.
+- Broker credentials and outbound broker connectivity.
 
-1. Keep the working persistent data at `/opt/data/mt5-data/config`.
-2. Build image explicitly: `docker build -t mt5-coolify:repaired .`.
-3. Copy reviewed files from `config/` into the persistent config directory; do not
-   replace or delete its `.wine` directory. Restart the MT5 service to load code.
-4. Use compose.yml in Coolify, set secret environment values from .env.example,
-   and configure the service HTTPS domain to internal port 8000.
-5. Never run another MT5 service over the same Wine prefix concurrently.
+The Dockerfile builds the Linux runtime dependencies. The prepared Windows/Wine
+environment is supplied separately through the persistent `/config` mount.
 
-Compose includes a build context for this repository and uses the locally built image.
-The build does NOT install the prepared Wine prefix or copy code into `/config`.
-A Git push alone does not copy source into
-the bind-mounted production config directory or deploy code automatically.
-Do not run a second standalone Compose service beside the existing Coolify one.
+## Configuration
 
-For log maintenance, install systemd units from systemd/ on the host, then run
-`systemctl daemon-reload` and `systemctl enable --now mt5-disk-guard.timer`.
-See config/DISK-POLICY.md. This scheduler is not installed by Compose.
-
-## API
-
-- `/docs`: REST Swagger and WebSocket tester; shared light/dark/system theme.
-- `GET /symbols`: broker symbol names, authenticated using X-API-Key.
-- `POST /history/candles`: JSON candles.
-- `POST /history/candles/export`: same filters, CSV/JSON attachment.
-- With both dates and no count/null, history streams all available range bars.
-  Otherwise default is 500 bars; explicit count supports pagination up to 10000.
-- `/ws/ticks`: authenticate and explicitly subscribe; no automatic XAUUSD feed.
-  Latest-tick polling every second, bounded RAM queues, no tick persistence.
-
-## Verification after deployment
-
-Check `/health`, authenticated symbols/history/export, WSS auth and explicit
-subscribe/unsubscribe. Range results depend on broker history and MaxBars.
-Long streams can time out; a broken download may be incomplete.
-
-### Automated service verification
-
-Use a separate Python environment with `websockets==15.0.1` installed.
-Supply `API_KEY` through a secure environment/secret mechanism, then run:
+Copy `.env.example` to `.env`, restrict its permissions, and fill in your values:
 
 ```bash
-python scripts/verify_deployment.py https://YOUR_DOMAIN
-```
-
-The script checks broker login, symbol discovery, history range handling,
-JSON/CSV export parity, documentation routes, and WSS subscribe/unsubscribe.
-It does not print credentials. History requests may populate terminal caches.
-It verifies an already running service; it does **not** prove empty-volume bootstrap,
-complete historical data availability, update/rollback safety or every-tick delivery.
-
-## Publish an image to GitHub Container Registry (GHCR)
-
-1. Open this repository's **Actions** tab.
-2. Select **Verify source and publish runtime recipe**.
-3. Choose **Run workflow**, branch `main`.
-4. Wait for compilation, Docker build and registry push to finish.
-5. Inspect the package **`ghcr.io/xhekage/mt5-docker`** and record its image digest.
-
-The workflow also runs for pushed version tags matching `v*`. It publishes SHA/version
-tags, not a mutable `latest`. Publishing uses the automatic GitHub Actions
-`GITHUB_TOKEN` with `packages: write`; no personal registry token is committed.
-Enable Actions under **Settings → Actions → General** if needed, and review package
-visibility/access explicitly. Keep the package private if that is your intended policy.
-
-**Build/publish success is not migration certification.** This workflow builds the
-current runtime recipe, which still requires the prepared persistent Wine data.
-It does not run the live broker smoke test or a fresh-volume integration test.
-
-### Pulling a private image
-
-Configure registry credentials in Coolify, or log in on the destination:
-
-```bash
-docker login ghcr.io -u YOUR_GITHUB_USERNAME
-```
-
-Enter a GitHub personal access token (classic) with `read:packages` and access to
-the package at the password prompt. Never put tokens in Git, command arguments,
-documentation or chat. The SSH deploy key authorizes Git, not GHCR.
-
-After testing a release, pin its exact digest, for example:
-
-```yaml
-image: ghcr.io/xhekage/mt5-docker@sha256:REPLACE_WITH_VERIFIED_DIGEST
-```
-
-The current `compose.yml` still uses a **local build** and `pull_policy: never`.
-To deploy from GHCR, replace its image reference with the verified digest, remove
-the build section, and change the pull policy to `missing` (or `always` as appropriate).
-Do not make that change in production until the image and prepared data are verified.
-
-## Migration readiness
-
-| Check | Status |
-| --- | --- |
-| Current prepared service: broker, REST, exports, docs, WSS smoke test | Passed on the existing server |
-| GHCR workflow definition | Added; remote execution must be checked in Actions |
-| Self-contained runtime with clean terminal/Wine bootstrap | Not implemented |
-| Deployment with an empty data volume on another host | Not verified |
-| Update/rollback on the new deployment design | Not verified |
-
-Do not treat this repository as a guaranteed one-command fresh-server restore.
-See [MIGRATION-VERIFICATION.md](MIGRATION-VERIFICATION.md) for required release gates,
-registry instructions and the distinction between service checks and migration acceptance.
-
-## Secrets and backups
-
-Store API key, broker credentials and VNC password in Coolify, never Git.
-Back up persistent data separately using encrypted external storage. Do not commit
-raw Coolify database exports, rendered container inspection or terminal login INI.
-Keep installation binaries and credentials out of Git history even in private repos.
-
-## Compose matching the current Coolify service
-
-`compose.yml` preserves the running service settings:
-
-- image `mt5-coolify:repaired`, build from the repository Dockerfile, pull_policy never;
-- restart unless-stopped, 2 CPU and 2 GiB RAM;
-- CUSTOM_USER=admin and secrets supplied through environment variables;
-- host mount `/opt/data/mt5-data/config:/config`;
-- VNC/web desktop port `3000:3000`, API `127.0.0.1:8100:8000`;
-- broker-login healthcheck and Docker log rotation 10m x 3.
-
-Port 3000 is published on all host interfaces to match the existing Coolify setup.
-Restrict it with the host firewall or bind it to localhost if remote VNC is unnecessary.
-RPyC port 18812 is not published.
-
-Old Coolify UUIDs, generated labels, container names and network IDs are omitted:
-the new Coolify installation generates its own. Host systemd maintenance is separate.
-
-### On a destination with prepared MT5 data
-
-```bash
-git clone git@github.com:xhekage/mt5-docker.git
-cd mt5-docker
 cp .env.example .env
 chmod 600 .env
-# Fill .env privately, restore the working Wine data, and copy reviewed config scripts.
+```
+
+| Variable | Description |
+| --- | --- |
+| `MT5_LOGIN` | Numeric trading account login. |
+| `MT5_PASSWORD` | Trading account password. |
+| `MT5_SERVER` | Exact broker server name. |
+| `API_KEY` | Key required by protected REST and WebSocket endpoints. |
+| `VNC_PASSWORD` | Password for the web desktop. |
+
+Never commit `.env`, terminal login files, Wine account data, or registry tokens.
+
+## Docker Compose deployment
+
+```bash
+git clone https://github.com/xhekage/mt5-docker.git
+cd mt5-docker
+```
+
+Prepare the persistent directory `/opt/data/mt5-data/config` with the working Wine
+environment, then copy the reviewed application files from `config/` into it.
+Do not overwrite or delete its `.wine` directory. Configure `.env`, then run:
+
+```bash
 docker compose -f compose.yml build
 docker compose -f compose.yml up -d --no-build
 curl http://127.0.0.1:8100/health
 ```
 
-Do not run those commands alongside the current production MT5 container.
+The service uses 2 CPUs, 2 GiB RAM, and restart policy `unless-stopped`.
+The API is bound to `127.0.0.1:8100`; web desktop port 3000 is published on host
+interfaces. Restrict port 3000 with a firewall or bind it to localhost if unnecessary.
+RPyC port 18812 is not published. Never run two terminals over the same Wine directory.
 
-### Coolify from Git
+## Coolify deployment
 
-Create a Git-backed Docker Compose resource, select this repository, branch main,
-and Compose path `/compose.yml`. Configure the five secrets listed in .env.example,
-restore the prepared persistent data on the destination, and ensure source scripts
-are copied into that data directory. Set the service domain to HTTPS on internal
-port 8000. Build and deploy, then verify health, REST and WSS.
+1. Create a Git-backed Docker Compose resource for this repository.
+2. Select branch `main` and Compose path `/compose.yml`.
+3. Configure the five environment variables above.
+4. Prepare the persistent data and application files on the destination host.
+5. Configure your HTTPS domain for service port **8000**.
+6. Build/deploy and check `/health` and `/docs`.
 
-This is configuration parity, NOT a fully automatic empty-server restore.
+Coolify generates its own resource IDs, labels, container names, and networks.
+
+## REST API
+
+Open **`https://YOUR_DOMAIN/docs`**, choose REST API, and click **Authorize**.
+Enter the API key only, without a Bearer prefix.
+
+| Method | Route | Description |
+| --- | --- | --- |
+| GET | `/health` | Public terminal, broker, and login status. |
+| GET | `/symbols` | Available broker symbol names. |
+| GET | `/account` | Connected trading account information. |
+| POST | `/history/candles` | Candle history as a JSON array. |
+| POST | `/history/candles/export` | Candle history as a CSV/JSON attachment. |
+
+### Candle history
+
+Only `symbol` and `timeframe` are required:
+
+```json
+{"symbol": "XAUUSD", "timeframe": "M1"}
+```
+
+This returns up to 500 latest available bars. For a complete available date range:
+
+```json
+{
+  "symbol": "XAUUSD",
+  "timeframe": "M1",
+  "date_from": "2026-01-01",
+  "date_to": "2026-01-31",
+  "order": "asc",
+  "include_current": false
+}
+```
+
+| Filter | Behavior |
+| --- | --- |
+| `date_from`, `date_to` | Inclusive opening-time bounds. Accept timezone-aware ISO 8601, Unix seconds, or YYYY-MM-DD UTC day boundaries. |
+| `count` | Explicit limit 1–10000. Omitted/null with both dates streams all available range bars; otherwise effective default is 500. |
+| `offset` | Skip newest eligible bars, 0–100000. Nonzero offset with both dates requires count. |
+| `order` | `asc` or `desc`; default `asc`. With count, sorting applies after page selection. |
+| `include_current` | Include the unfinished current bar; default `true`. |
+
+For pagination, specify count and increment offset; keep date_to fixed.
+Results depend on broker history/MaxBars. Long streams can time out, and a
+disconnected download may be incomplete. Terminal timestamps are not adjusted
+for the broker's time offset.
+
+### Export
+
+Send the same filters to `/history/candles/export`, with optional `format`:
+
+```json
+{
+  "symbol": "XAUUSD",
+  "timeframe": "H1",
+  "count": 100,
+  "include_current": false,
+  "format": "csv"
+}
+```
+
+Format defaults to CSV; JSON is also supported. Both contain `time`, `open`, `high`,
+`low`, `close`, `tick_volume`, `spread`, and `real_volume`. Downloads are generated
+without temporary files on server SSD. History retrieval can still populate the
+terminal's broker-history cache.
+
+## WebSocket
+
+Connect to `wss://YOUR_DOMAIN/ws/ticks`. Browser clients send authentication first:
+
+```json
+{"action": "auth", "api_key": "YOUR_API_KEY"}
+```
+
+Backend clients may use the `X-API-Key` handshake header instead. Never put keys in URLs.
+No symbol is subscribed automatically. After the `ready` event, send:
+
+```json
+{"action": "subscribe", "symbols": ["XAUUSD"]}
+```
+
+To stop or check responsiveness:
+
+```json
+{"action": "unsubscribe", "symbols": ["XAUUSD"]}
+{"action": "ping"}
+```
+
+Ticks are polled every second and sent when changed. This is not a guarantee of
+every broker tick; no replay is provided. Reconnect with backoff, authenticate,
+and subscribe again. An idle/closed market may produce no new ticks.
+Use the WebSocket tab in `/docs` for a browser tester, or `/ws/protocol` for protocol details.
+
+## Logging and disk maintenance
+
+Docker logs rotate at 10 MB × 3 files. To enable periodic MT5 file-log maintenance,
+copy the units in `systemd/` to `/etc/systemd/system/`, then run:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now mt5-disk-guard.timer
+```
+
+The guard checks every 15 minutes, bounds large `.log` files and removes expired
+logs without deleting broker history. See [DISK-POLICY.md](config/DISK-POLICY.md).
+
+## Verification
+
+Install `websockets==15.0.1` in a separate Python environment. Supply `API_KEY`
+securely through the environment, then run:
+
+```bash
+python scripts/verify_deployment.py https://YOUR_DOMAIN
+```
+
+Checks include broker login, symbols, history, CSV/JSON exports, documentation,
+and WSS subscribe/unsubscribe. The script does not print the API key.
+
+## Publish to GHCR
+
+Open **Actions → Verify source and publish runtime recipe → Run workflow** on `main`.
+The workflow builds and publishes `ghcr.io/xhekage/mt5-docker` using the automatic
+GitHub Actions token. Pushing a `v*` version tag also triggers publishing.
+
+For private pulls, configure registry credentials in Coolify or use:
+
+```bash
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+```
+
+Enter a token with `read:packages` and package access at the password prompt.
+To use GHCR instead of local builds, remove the Compose build section, replace
+the image with your tested GHCR digest, and change pull_policy from `never` to `missing`.
+The published runtime still needs the prepared persistent Wine data.
+
+## Updating
+
+Pull the reviewed source, copy updated application files into the persistent
+config directory, rebuild if runtime dependencies changed, and redeploy through
+your existing deployment method. A Git push alone does not update bind-mounted code.
+Keep broker credentials and encrypted data backups separate from Git.
